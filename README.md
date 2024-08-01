@@ -1,0 +1,1 @@
+**java -jar IdeaPlaatformTestTask.jar path/to/tickets.json**
