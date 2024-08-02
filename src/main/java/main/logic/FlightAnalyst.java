@@ -9,9 +9,12 @@ import java.io.IOException;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
+
+
 
 public class FlightAnalyst {
 
@@ -37,21 +40,34 @@ public class FlightAnalyst {
     }
 
     private static void analyzeTickets(List<Ticket> tickets) {
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yy");
+        DateTimeFormatter timeFormatter1 = DateTimeFormatter.ofPattern("H:mm");
+        DateTimeFormatter timeFormatter2 = DateTimeFormatter.ofPattern("HH:mm");
+
+        ZoneId vladivostokZone = ZoneId.of("Asia/Vladivostok");
+        ZoneId telAvivZone = ZoneId.of("Asia/Jerusalem");
+
         Map<String, Long> minFlightTimes = new HashMap<>();
         List<Integer> prices = new ArrayList<>();
-        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
 
         for (Ticket ticket : tickets) {
             if ("VVO".equals(ticket.origin()) && "TLV".equals(ticket.destination())) {
                 try {
-                    long departureTime = sdf.parse(ticket.departure_time()).getTime();
-                    long arrivalTime = sdf.parse(ticket.arrival_time()).getTime();
-                    long flightTime = (arrivalTime - departureTime) / (1000 * 60);
+                    LocalDate departureDate = LocalDate.parse(ticket.departure_date(), dateFormatter);
+                    LocalTime departureTime = parseTime(ticket.departure_time(), timeFormatter1, timeFormatter2);
+                    ZonedDateTime departureDateTime = ZonedDateTime.of(departureDate, departureTime, vladivostokZone);
+
+                    LocalDate arrivalDate = LocalDate.parse(ticket.arrival_date(), dateFormatter);
+                    LocalTime arrivalTime = parseTime(ticket.arrival_time(), timeFormatter1, timeFormatter2);
+                    ZonedDateTime arrivalDateTime = ZonedDateTime.of(arrivalDate, arrivalTime, telAvivZone);
+
+                    long flightTime = Duration.between(departureDateTime, arrivalDateTime).toMinutes();
 
                     minFlightTimes.put(ticket.carrier(), Math.min(minFlightTimes.getOrDefault(ticket.carrier(), Long.MAX_VALUE), flightTime));
+
                     prices.add(ticket.price());
-                } catch (ParseException e) {
-                    e.printStackTrace();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
                 }
             }
         }
@@ -73,4 +89,13 @@ public class FlightAnalyst {
         System.out.println("Медиана: " + medianPrice);
         System.out.println("Разница: " + (averagePrice - medianPrice));
     }
+
+    private static LocalTime parseTime(String time, DateTimeFormatter formatter1, DateTimeFormatter formatter2) {
+        try {
+            return LocalTime.parse(time, formatter1);
+        } catch (DateTimeParseException e) {
+            return LocalTime.parse(time, formatter2);
+        }
+    }
+
 }
